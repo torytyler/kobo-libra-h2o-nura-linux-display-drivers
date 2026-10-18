@@ -1,5 +1,9 @@
 # Kobo Libra H2O — Nura Linux Display Drivers
 
+![Kobo Libra H2O booting Nura Linux, with the working EPDC framebuffer console](assets/banner-kobo-libra-h2o-nura.png)
+
+*The Libra H2O running Nura Linux with the EPDC framebuffer console working — “Welcome to Nura!” / “Kernel 7.1.10 on an armv7l”.*
+
 Working EPDC/e-paper display support for the **Kobo Libra H2O (N873)** under
 **Nura Linux** (postmarketOS/Alpine, mainline i.MX DRM).
 
