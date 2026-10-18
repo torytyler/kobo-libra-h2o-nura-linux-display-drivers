@@ -1,0 +1,105 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * EXPERIMENTAL EPDC enablement for the Kobo Libra H2O (E70K02).
+ *
+ * The upstream imx6sll-kobo-librah2o.dts does not enable the EPDC node and
+ * does not provide an EPDC pinctrl group.  This file adds both, using:
+ *   - pinctrl values from the Kobo vendor DTS (imx6sll-e70q02.dts)
+ *   - EPDC mode/porch values and GDCLK/GDSP offsets from the Kobo vendor
+ *     kernel's `ed070kh1_mode` (drivers/video/fbdev/mxc/mxc_epdc_v2_fb.c,
+ *     parent clock 540 MHz branch).
+ *
+ * The retail N873 has the SY7636A EPDC PMIC at I2C 0x62, matching the
+ * mainline e70k02.dtsi.  A scan of the live board shows 0x62 responding and
+ * 0x68 (TPS6518x) not responding; the stock DTB contains both nodes because
+ * it covers multiple board variants / is patched by the stock bootloader.
+ *
+ * This is still a starting point, not a tested port.  The vendor timing is
+ * for the 1264x1680 native panel orientation; the mainline driver may need
+ * small adjustments.  See the guide.
+ */
+
+&iomuxc {
+	pinctrl_epdc0: epdcgrp0 {
+		fsl,pins = <
+			MX6SLL_PAD_EPDC_DATA00__EPDC_DATA00	0x100b1
+			MX6SLL_PAD_EPDC_DATA01__EPDC_DATA01	0x100b1
+			MX6SLL_PAD_EPDC_DATA02__EPDC_DATA02	0x100b1
+			MX6SLL_PAD_EPDC_DATA03__EPDC_DATA03	0x100b1
+			MX6SLL_PAD_EPDC_DATA04__EPDC_DATA04	0x100b1
+			MX6SLL_PAD_EPDC_DATA05__EPDC_DATA05	0x100b1
+			MX6SLL_PAD_EPDC_DATA06__EPDC_DATA06	0x100b1
+			MX6SLL_PAD_EPDC_DATA07__EPDC_DATA07	0x100b1
+			MX6SLL_PAD_EPDC_DATA08__EPDC_DATA08	0x100b1
+			MX6SLL_PAD_EPDC_DATA09__EPDC_DATA09	0x100b1
+			MX6SLL_PAD_EPDC_DATA10__EPDC_DATA10	0x100b1
+			MX6SLL_PAD_EPDC_DATA11__EPDC_DATA11	0x100b1
+			MX6SLL_PAD_EPDC_DATA12__EPDC_DATA12	0x100b1
+			MX6SLL_PAD_EPDC_DATA13__EPDC_DATA13	0x100b1
+			MX6SLL_PAD_EPDC_DATA14__EPDC_DATA14	0x100b1
+			MX6SLL_PAD_EPDC_DATA15__EPDC_DATA15	0x100b1
+			MX6SLL_PAD_EPDC_SDCLK__EPDC_SDCLK_P	0x100b1
+			MX6SLL_PAD_EPDC_SDLE__EPDC_SDLE		0x100b1
+			MX6SLL_PAD_EPDC_SDOE__EPDC_SDOE		0x100b1
+			MX6SLL_PAD_EPDC_SDSHR__EPDC_SDSHR	0x100b1
+			MX6SLL_PAD_EPDC_SDCE0__EPDC_SDCE0	0x100b1
+			MX6SLL_PAD_EPDC_GDCLK__EPDC_GDCLK	0x100b1
+			MX6SLL_PAD_EPDC_GDOE__EPDC_GDOE		0x100b1
+			MX6SLL_PAD_EPDC_GDRL__EPDC_GDRL		0x100b1
+			MX6SLL_PAD_EPDC_GDSP__EPDC_GDSP		0x100b1
+		>;
+	};
+};
+
+&epdc {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_epdc0>;
+
+	V3P3-supply = <&epd_pmic_supply>;
+	VCOM-supply = <&reg_epdpmic>;
+	DISPLAY-supply = <&epd_pmic_supply>;
+
+	/*
+	 * The vendor 540 MHz timing branch expects a 540 MHz EPDC pixel
+	 * clock.  The mainline clock driver leaves pll3_pfd2 at 508.24 MHz,
+	 * which makes epdc_pix 127.06 MHz (/4) and stretches the image
+	 * horizontally.  Pin the PFD to 540 MHz before setting epdc_pix.
+	 */
+	assigned-clocks = <&clks IMX6SLL_CLK_PLL3_PFD2>,
+			  <&clks IMX6SLL_CLK_EPDC_PIX>;
+	assigned-clock-rates = <540000000>, <135000000>;
+	assigned-clock-parents = <&clks IMX6SLL_CLK_PLL3_USB_OTG>,
+				 <&clks IMX6SLL_CLK_EPDC_PODF>;
+
+	vscan-holdoff = <4>;
+	sdoed-width = <10>;
+	sdoed-delay = <20>;
+	sdoez-width = <10>;
+	sdoez-delay = <20>;
+	gdclk-hp-offs = <746>;
+	gdsp-offs = <553>;
+	gdoe-offs = <0>;
+	gdclk-offs = <83>;
+	num-ce = <1>;
+
+	/*
+	 * This unit's NTX hwconfig has bDisplayBusWidth=1, i.e. a 16-bit
+	 * SDDO source-driver bus.  Mainline defaults to 8-bit/4 pixels per
+	 * SDCLK, which produces vertical banding.
+	 */
+	sddo-width = <16>;
+
+	status = "okay";
+
+	timing {
+		clock-frequency = <135000000>;
+		hactive = <1264>;
+		hback-porch = <28>;
+		hfront-porch = <204>;
+		hsync-len = <72>;
+		vactive = <1680>;
+		vback-porch = <4>;
+		vfront-porch = <12>;
+		vsync-len = <1>;
+	};
+};

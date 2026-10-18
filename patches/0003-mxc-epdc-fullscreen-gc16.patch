@@ -1,0 +1,27 @@
+diff -ruN a/drivers/gpu/drm/mxc-epdc/epdc_update.c b/drivers/gpu/drm/mxc-epdc/epdc_update.c
+--- a/drivers/gpu/drm/mxc-epdc/epdc_update.c	2026-10-18 02:05:36.020781571 -0400
++++ b/drivers/gpu/drm/mxc-epdc/epdc_update.c	2026-10-18 02:05:36.039424040 -0400
+@@ -885,9 +885,21 @@
+ 	}
+ 	/* Initialize per-update marker list */
+ 	upd_desc->upd_data.update_region = *clip;
+-	upd_desc->upd_data.waveform_mode = WAVEFORM_MODE_AUTO;
++	/*
++	 * Use a full GC16 refresh for a full-screen change (image viewer,
++	 * screen clear, ...).  Small console/UI clips keep the fast partial
++	 * auto-waveform path.
++	 */
++	if (clip->x1 == 0 && clip->y1 == 0 &&
++	    clip->x2 == priv->epdc_mem_width &&
++	    clip->y2 == priv->epdc_mem_height) {
++		upd_desc->upd_data.waveform_mode = priv->wv_modes.mode_gc16;
++		upd_desc->upd_data.update_mode = UPDATE_MODE_FULL;
++	} else {
++		upd_desc->upd_data.waveform_mode = WAVEFORM_MODE_AUTO;
++		upd_desc->upd_data.update_mode = UPDATE_MODE_PARTIAL;
++	}
+ 	upd_desc->upd_data.temp = TEMP_USE_AMBIENT;
+-	upd_desc->upd_data.update_mode = UPDATE_MODE_PARTIAL;
+ 	upd_desc->update_order = priv->order_cnt++;
+ 	list_add_tail(&upd_desc->list, &priv->upd_pending_list);
+ 

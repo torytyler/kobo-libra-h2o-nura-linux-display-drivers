@@ -1,0 +1,66 @@
+diff -ruN a/Documentation/devicetree/bindings/display/imx/fsl,mxc-epdc.yaml b/Documentation/devicetree/bindings/display/imx/fsl,mxc-epdc.yaml
+--- a/Documentation/devicetree/bindings/display/imx/fsl,mxc-epdc.yaml	2026-10-18 01:55:28.987430981 -0400
++++ b/Documentation/devicetree/bindings/display/imx/fsl,mxc-epdc.yaml	2026-10-18 01:55:29.020963152 -0400
+@@ -75,6 +75,11 @@
+     $ref: /schemas/types.yaml#/definitions/uint32
+     maxItems: 1
+ 
++  sddo-width:
++    description: EPDC source-driver data bus width in bits (8 or 16).
++    $ref: /schemas/types.yaml#/definitions/uint32
++    enum: [8, 16]
++
+   timing:
+     $ref: /display/panel/panel-timing.yaml#
+ 
+diff -ruN a/drivers/gpu/drm/mxc-epdc/epdc_hw.c b/drivers/gpu/drm/mxc-epdc/epdc_hw.c
+--- a/drivers/gpu/drm/mxc-epdc/epdc_hw.c	2026-10-18 01:55:28.979610792 -0400
++++ b/drivers/gpu/drm/mxc-epdc/epdc_hw.c	2026-10-18 01:55:29.020934298 -0400
+@@ -254,13 +254,16 @@
+ 	 * LVDS_MODE_CE = DISABLED
+ 	 * LVDS_MODE = DISABLED
+ 	 * DUAL_SCAN = DISABLED
+-	 * SDDO_WIDTH = 8bit
+-	 * PIXELS_PER_SDCLK = 4
++	 * SDDO_WIDTH / PIXELS_PER_SDCLK = panel bus width
+ 	 */
+ 	reg_val =
+ 	    ((priv->imx_mode.vscan_holdoff << EPDC_TCE_CTRL_VSCAN_HOLDOFF_OFFSET) &
+-	     EPDC_TCE_CTRL_VSCAN_HOLDOFF_MASK)
+-	    | EPDC_TCE_CTRL_PIXELS_PER_SDCLK_4;
++	     EPDC_TCE_CTRL_VSCAN_HOLDOFF_MASK);
++	if (priv->imx_mode.sddo_width == 16)
++		reg_val |= EPDC_TCE_CTRL_SDDO_WIDTH_16BIT |
++			   EPDC_TCE_CTRL_PIXELS_PER_SDCLK_8;
++	else
++		reg_val |= EPDC_TCE_CTRL_PIXELS_PER_SDCLK_4;
+ 	epdc_write(priv, EPDC_TCE_CTRL, reg_val);
+ 
+ 	/* EPDC_TCE_HSCAN */
+diff -ruN a/drivers/gpu/drm/mxc-epdc/mxc_epdc_drv.c b/drivers/gpu/drm/mxc-epdc/mxc_epdc_drv.c
+--- a/drivers/gpu/drm/mxc-epdc/mxc_epdc_drv.c	2026-10-18 01:55:28.979651099 -0400
++++ b/drivers/gpu/drm/mxc-epdc/mxc_epdc_drv.c	2026-10-18 01:55:29.020900094 -0400
+@@ -176,6 +176,12 @@
+ 	if (ret)
+ 		return ret;
+ 
++	/* Optional: 16-bit SDDO panels (e.g. Kobo Libra H2O ED070KH1). */
++	ret = of_property_read_u32(drm->dev->of_node, "sddo-width",
++				   &priv->imx_mode.sddo_width);
++	if (ret)
++		priv->imx_mode.sddo_width = 0;
++
+ 	ret = of_get_display_timing(drm->dev->of_node, "timing", &priv->timing);
+ 	if (ret)
+ 		return ret;
+diff -ruN a/drivers/gpu/drm/mxc-epdc/mxc_epdc.h b/drivers/gpu/drm/mxc-epdc/mxc_epdc.h
+--- a/drivers/gpu/drm/mxc-epdc/mxc_epdc.h	2026-10-18 01:55:28.979634992 -0400
++++ b/drivers/gpu/drm/mxc-epdc/mxc_epdc.h	2026-10-18 01:55:29.020858085 -0400
+@@ -63,6 +63,7 @@
+ 	u32 gdoe_offs;
+ 	u32 gdclk_offs;
+ 	u32 num_ce;
++	u32 sddo_width; /* 8 or 16 bits, 0 = default 8 */
+ };
+ 
+ struct clk;
